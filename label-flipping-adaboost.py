@@ -34,12 +34,14 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
 
-seeds = [5, 7, 10, 11, 27, 42, 314, 666, 1618, 3901]
-n_runs = 100
-flip_original = True
+seeds = [5, 7, 10, 11, 27, 42, 314, 666, 1618, 3901]  # Chosen arbitrarily
+max_ensemble_size = 10000  # Show behavior up to and including this ensemble size
+flip_original = True  # If True, directly flip data labels. Else, copy data.
+plot_runs = False  # If True, plot individual run errors.
+n_runs = 100  # For statistical significance
 z = 1.96  # 95% confidence interval
-plot_runs = False
 
+# Save results in this local directory
 savedir = '.\Results\\' + str(date.today()) + '\\2Class-100-runs'
 try:
     os.makedirs(savedir)
@@ -70,7 +72,6 @@ def main():
                                            random_state=seed)
 
         skf = StratifiedKFold(n_splits=n_runs)
-
         run = 1
         for _, fold in skf.split(X=data, y=labels):
             print('Seed:', seed, '| Run:', run)
@@ -113,67 +114,29 @@ def main():
                 d_train_p = np.vstack((d_train, d_p))
                 y_train_p = np.hstack((y_train, y_p))
 
-            ensemble = make_ensemble(BaseClassifier)
-
+            # Train and test on baseline data
             print('Fitting model on training data...')
+            ensemble = make_ensemble(BaseClassifier)
             ensemble.fit(d_train, y_train)
 
-            test_errors = []
-
             print('Predicting on test data...')
-            for prediction in ensemble.staged_predict(d_test):
-                test_errors.append(1. - accuracy_score(y_test, prediction))
-            n_trees = len(ensemble)
-            ensemble_errors = ensemble.estimator_errors_[:n_trees]
+            test_errors = [1. - accuracy_score(y_test, p) for p in
+                           ensemble.staged_predict(d_test)]
 
-            if plot_runs:
-                print('Plotting...')
-                plt.figure()
-                plt.suptitle('Testing on AdaBoost')
-                plt.subplot(311)
-                plt.plot(range(1, len(test_errors) + 1),
-                         test_errors,
-                         label='Baseline')
-                plt.legend()
-                plt.grid()
-                plt.ylabel('Test Error')
+            ensemble_errors = ensemble.estimator_errors_[:len(ensemble)]
 
-                plt.subplot(312)
-                plt.plot(range(1, len(ensemble_errors) + 1),
-                         ensemble_errors,
-                         c='black', label='Baseline')
-                plt.legend()
-                plt.grid()
-                plt.ylabel('Classifier Error')
-
-            ensemble_p = make_ensemble(BaseClassifier)
-
+            # Train and test on poisoned data
             print('Fitting model on poisoned training data...')
+            ensemble_p = make_ensemble(BaseClassifier)
             ensemble_p.fit(d_train_p, y_train_p)
 
-            test_errors_p = []
             print('Predicting on test data...')
-            for prediction in ensemble_p.staged_predict(d_test):
-                test_errors_p.append(1. - accuracy_score(y_test, prediction))
+            test_errors_p = [1. - accuracy_score(y_test, p) for p in
+                             ensemble_p.staged_predict(d_test)]
 
-            ensemble_errors_p = ensemble_p.estimator_errors_[:n_trees]
+            ensemble_errors_p = ensemble_p.estimator_errors_[:len(ensemble_p)]
 
-            if plot_runs:
-                print('Plotting...')
-                plt.subplot(311)
-                plt.plot(range(1, len(test_errors_p) + 1),
-                         test_errors_p,
-                         label='Poisoned')
-                plt.legend()
-                plt.subplot(313)
-                plt.plot(range(1, len(ensemble_errors_p) + 1),
-                         ensemble_errors_p,
-                         c='black', label='Poisoned')
-                plt.legend()
-                plt.grid()
-                plt.xlabel('Number of Trees')
-                plt.ylabel('Classifier Error')
-
+            # Store individual run errors for statistical analysis
             test_errors_.append(test_errors)
             test_errors_p_.append(test_errors_p)
 
@@ -182,12 +145,48 @@ def main():
             print('Poisoned error:', test_errors_p[-1],
                   '| # Trees:', len(ensemble_p))
 
-            if len(ensemble) < 10000 or len(ensemble_p) < 10000:
+            # Plot individual run errors
+            if plot_runs:
+                print('Plotting...')
+                plt.figure()
+                plt.suptitle('Testing on AdaBoost')
+                plt.subplot(311)
+                plt.plot(range(1, len(test_errors) + 1),
+                         test_errors,
+                         label='Baseline')
+                plt.plot(range(1, len(test_errors_p) + 1),
+                         test_errors_p,
+                         label='Poisoned')
+                plt.ylabel('Test Error')
+                plt.grid()
+                plt.legend()
+
+                plt.subplot(312)
+                plt.plot(range(1, len(ensemble_errors) + 1),
+                         ensemble_errors,
+                         c='black', label='Baseline')
+                plt.ylabel('Classifier Error')
+                plt.grid()
+                plt.legend()
+
+                plt.subplot(313)
+                plt.plot(range(1, len(ensemble_errors_p) + 1),
+                         ensemble_errors_p,
+                         c='black', label='Poisoned')
+                plt.xlabel('Number of Trees')
+                plt.ylabel('Classifier Error')
+                plt.grid()
+                plt.legend()
+
+            if len(ensemble) < max_ensemble_size or \
+                            len(ensemble_p) < max_ensemble_size:
                 less_than_max = True
             if less_than_max:
-                print('Warning: Ensemble created with fewer than 10000 trees.')
+                print('Warning: Ensemble created with fewer than',
+                      max_ensemble_size, 'trees.')
             print('---------------------------')
 
+        # Statistical analysis over all runs
         print('Calculating average errors and confidence intervals...')
         test_errors_ = np.array(test_errors_)
         errors_mean = np.mean(test_errors_, axis=0)
@@ -203,6 +202,7 @@ def main():
         confidence_lower_p = errors_mean_p \
                              - (z * (errors_std_p / np.sqrt(n_runs)))
 
+        # Plot average errors and confidence intervals
         plt.figure()
         plt.title('Average Error for Seed ' + str(seed)
                   + ' Over ' + str(n_runs) + ' Runs (95% Confidence Interval)')
@@ -250,12 +250,12 @@ def main():
                          confidence_upper_p,
                          color='C1',
                          alpha=0.5)
-
-        plt.legend()
-        plt.grid()
         plt.xlabel('Number of Trees')
         plt.ylabel('Test Error')
+        plt.grid()
+        plt.legend()
 
+        # Save figure to file
         fig = plt.gcf()
         fig.set_size_inches((11, 8.5), forward=False)
         fig.savefig(fname=(savedir + '\\seed-' + str(seed) + '.pdf'),
@@ -269,7 +269,7 @@ def main():
     print('Done.')
 
 def make_classifier():
-    tree = DecisionTreeClassifier(criterion='gini',
+    return DecisionTreeClassifier(criterion='gini',
                                   splitter='best',
                                   max_depth=1,
                                   min_samples_split=2,
@@ -282,17 +282,13 @@ def make_classifier():
                                   class_weight=None,
                                   presort=False)
 
-    return tree
-
 def make_ensemble(BaseClassifier):
     print('Initializing boosted classifier...')
-    ensemble = AdaBoostClassifier(BaseClassifier,
-                                  n_estimators=10000,
-                                  learning_rate=1.0,
-                                  algorithm='SAMME.R',
-                                  random_state=3901)
-
-    return ensemble
+    return AdaBoostClassifier(BaseClassifier,
+                              n_estimators=max_ensemble_size,
+                              learning_rate=1.0,
+                              algorithm='SAMME.R',
+                              random_state=3901)
 
 if __name__ == '__main__':
     main()
