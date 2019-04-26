@@ -23,34 +23,24 @@
 
 import os
 import time
-from datetime import date
 from copy import deepcopy
 import numpy as np
 from sklearn.datasets import make_classification
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split as tts
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
-
-seeds = [5, 7, 10, 11, 27, 42, 314, 666, 1618, 3901]  # Chosen arbitrarily
-max_ensemble_size = 10000  # Show behavior up to and including this ensemble size
-flip_original = True  # If True, directly flip data labels. Else, copy data.
-plot_runs = False  # If True, plot individual run errors.
-n_runs = 100  # For statistical significance
-z = 1.96  # 95% confidence interval
+import utils
 
 # Save results in this local directory
-savedir = '.\Results\\' + str(date.today()) + '\\2Class-10-seeds-100-runs'
 try:
-    os.makedirs(savedir)
+    os.makedirs(utils.savedir)
 except FileExistsError:
     pass
 
 def main():
     start = time.time()
-    for seed in seeds:
+    for seed in utils.seeds:
         less_than_max = False
         test_errors_ = []
         test_errors_p_ = []
@@ -71,7 +61,7 @@ def main():
                                            shuffle=True,
                                            random_state=seed)
 
-        skf = StratifiedKFold(n_splits=n_runs)
+        skf = StratifiedKFold(n_splits=utils.n_runs)
         run = 1
         for _, fold in skf.split(X=data, y=labels):
             print('Seed:', seed, '| Run:', run)
@@ -86,14 +76,14 @@ def main():
                                                    stratify=None)
 
             print('Initializing ensemble base classifier...')
-            BaseClassifier = make_classifier()
+            BaseClassifier = utils.make_classifier()
 
             print('Generating poisoned dataset...')
             flip_idx = np.random.choice(range(len(y_train)),
                                         size=int(0.1*len(y_train)),
                                         replace=False)
 
-            if flip_original:
+            if utils.flip_original:
                 d_train_p = d_train
                 y_train_p = deepcopy(y_train)
                 for idx in flip_idx:
@@ -109,7 +99,7 @@ def main():
 
             # Train and test on baseline data
             print('Fitting model on training data...')
-            ensemble = make_ensemble(BaseClassifier)
+            ensemble = utils.make_ensemble(BaseClassifier)
             ensemble.fit(d_train, y_train)
 
             print('Predicting on test data...')
@@ -120,7 +110,7 @@ def main():
 
             # Train and test on poisoned data
             print('Fitting model on poisoned training data...')
-            ensemble_p = make_ensemble(BaseClassifier)
+            ensemble_p = utils.make_ensemble(BaseClassifier)
             ensemble_p.fit(d_train_p, y_train_p)
 
             print('Predicting on test data...')
@@ -139,7 +129,7 @@ def main():
                   '| # Trees:', len(ensemble_p))
 
             # Plot individual run errors
-            if plot_runs:
+            if utils.plot_runs:
                 print('Plotting...')
                 plt.figure()
                 plt.suptitle('Testing on AdaBoost')
@@ -173,122 +163,33 @@ def main():
 
             # Check if Adaboost algorithm terminated early (may cause issues
             # in statistical analysis)
-            if len(ensemble) < max_ensemble_size or \
-                            len(ensemble_p) < max_ensemble_size:
+            if len(ensemble) < utils.max_ensemble_size or \
+                            len(ensemble_p) < utils.max_ensemble_size:
                 less_than_max = True
             if less_than_max:
                 print('Warning: Ensemble created with fewer than',
-                      max_ensemble_size, 'trees.')
+                      utils.max_ensemble_size, 'trees.')
             print('---------------------------')
 
-        # Statistical analysis over all runs...
-        print('Calculating average errors and confidence intervals...')
+        # Save experimental data to file...
+        savedir_ = utils.savedir + '\\seed-' + str(seed)
 
         # ...for baseline ensembles
         test_errors_ = np.array(test_errors_)
-        errors_mean = np.mean(test_errors_, axis=0)
-        errors_std = np.std(test_errors_, axis=0)
-        confidence_upper = errors_mean + (z * (errors_std / np.sqrt(n_runs)))
-        confidence_lower = errors_mean - (z * (errors_std / np.sqrt(n_runs)))
+        np.savetxt(savedir_ + '-test-errors-baseline.csv', test_errors_,
+                   fmt='%.18f', delimiter=',')
 
         # ...for poisoned ensembles
         test_errors_p_ = np.array(test_errors_p_)
-        errors_mean_p = np.mean(test_errors_p_, axis=0)
-        errors_std_p = np.std(test_errors_p_, axis=0)
-        confidence_upper_p = errors_mean_p \
-                             + (z * (errors_std_p / np.sqrt(n_runs)))
-        confidence_lower_p = errors_mean_p \
-                             - (z * (errors_std_p / np.sqrt(n_runs)))
+        np.savetxt(savedir_ + '-test-errors-poisoned.csv', test_errors_p_,
+                   fmt='%.18f', delimiter=',')
 
         # Plot average errors and confidence intervals...
-        plt.figure()
-
-        # ...for baseline ensembles
-        plt.plot(range(1, len(errors_mean) + 1),
-                 errors_mean,
-                 color='C0',
-                 linewidth=1.75,
-                 label='Baseline')
-        plt.plot(range(1, len(confidence_upper) + 1),
-                 confidence_upper,
-                 color='C0',
-                 linewidth=0.5,
-                 label='_nolegend_')
-        plt.plot(range(1, len(confidence_lower) + 1),
-                 confidence_lower,
-                 color='C0',
-                 linewidth=0.5,
-                 label='_nolegend_')
-        plt.fill_between(range(1, len(errors_mean) + 1),
-                         confidence_lower,
-                         confidence_upper,
-                         color='C0',
-                         alpha=0.5)
-
-        # ...for poisoned ensembles
-        plt.plot(range(1, len(errors_mean_p) + 1),
-                 errors_mean_p,
-                 color='C1',
-                 linewidth=1.75,
-                 label='Poisoned')
-        plt.plot(range(1, len(confidence_upper_p) + 1),
-                 confidence_upper_p,
-                 color='C1',
-                 linewidth=0.5,
-                 label='_nolegend_')
-        plt.plot(range(1, len(confidence_lower_p) + 1),
-                 confidence_lower_p,
-                 color='C1',
-                 linewidth=0.5,
-                 label='_nolegend_')
-        plt.fill_between(range(1, len(errors_mean_p) + 1),
-                         confidence_lower_p,
-                         confidence_upper_p,
-                         color='C1',
-                         alpha=0.5)
-
-        # Plot settings
-        plt.title('Average Error for Seed ' + str(seed)
-                  + ' Over ' + str(n_runs) + ' Runs (95% Confidence Interval)')
-        plt.xlabel('Number of Trees')
-        plt.ylabel('Test Error')
-        plt.grid()
-        plt.legend()
-
-        # Save figure to file
-        fig = plt.gcf()
-        fig.set_size_inches((11, 8.5), forward=False)
-        fig.savefig(fname=(savedir + '\\seed-' + str(seed) + '.pdf'),
-                    format='pdf',
-                    orientation='landscape',
-                    bbox_inches='tight',
-                    dpi=1500)
+        utils.plot_statistical_significance(test_errors_, test_errors_p_, seed)
 
     print('Runtime:', time.time() - start, 'seconds.')
     plt.show()
     print('Done.')
-
-def make_classifier():
-    return DecisionTreeClassifier(criterion='gini',
-                                  splitter='best',
-                                  max_depth=1,
-                                  min_samples_split=2,
-                                  min_samples_leaf=1,
-                                  min_weight_fraction_leaf=0.0,
-                                  max_features=None,
-                                  random_state=7,
-                                  max_leaf_nodes=None,
-                                  min_impurity_decrease=0.0,
-                                  class_weight=None,
-                                  presort=False)
-
-def make_ensemble(BaseClassifier):
-    print('Initializing boosted classifier...')
-    return AdaBoostClassifier(BaseClassifier,
-                              n_estimators=max_ensemble_size,
-                              learning_rate=1.0,
-                              algorithm='SAMME.R',
-                              random_state=3901)
 
 if __name__ == '__main__':
     main()
