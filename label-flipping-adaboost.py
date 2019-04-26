@@ -42,7 +42,7 @@ n_runs = 100  # For statistical significance
 z = 1.96  # 95% confidence interval
 
 # Save results in this local directory
-savedir = '.\Results\\' + str(date.today()) + '\\2Class-100-runs'
+savedir = '.\Results\\' + str(date.today()) + '\\2Class-10-seeds-100-runs'
 try:
     os.makedirs(savedir)
 except FileExistsError:
@@ -94,7 +94,7 @@ def main():
                                         replace=False)
 
             if flip_original:
-                d_train_p = deepcopy(d_train)
+                d_train_p = d_train
                 y_train_p = deepcopy(y_train)
                 for idx in flip_idx:
                     if y_train_p[idx] == 0:
@@ -102,15 +102,8 @@ def main():
                     else:
                         y_train_p[idx] = 0
             else:
-                d_p = np.zeros((len(flip_idx), d_train.shape[1]))
-                y_p = np.zeros((len(flip_idx)))
-                i = 0
-                for idx in flip_idx:
-                    d_p[i] = d_train[idx, :]
-                    if y_train[idx] == 0:
-                        y_p[i] = 1
-                    i += 1
-
+                d_p = [d_train[idx, :] for idx in flip_idx]
+                y_p = [1 if y_train[idx] == 0 else 0 for idx in flip_idx]
                 d_train_p = np.vstack((d_train, d_p))
                 y_train_p = np.hstack((y_train, y_p))
 
@@ -178,6 +171,8 @@ def main():
                 plt.grid()
                 plt.legend()
 
+            # Check if Adaboost algorithm terminated early (may cause issues
+            # in statistical analysis)
             if len(ensemble) < max_ensemble_size or \
                             len(ensemble_p) < max_ensemble_size:
                 less_than_max = True
@@ -186,14 +181,17 @@ def main():
                       max_ensemble_size, 'trees.')
             print('---------------------------')
 
-        # Statistical analysis over all runs
+        # Statistical analysis over all runs...
         print('Calculating average errors and confidence intervals...')
+
+        # ...for baseline ensembles
         test_errors_ = np.array(test_errors_)
         errors_mean = np.mean(test_errors_, axis=0)
         errors_std = np.std(test_errors_, axis=0)
         confidence_upper = errors_mean + (z * (errors_std / np.sqrt(n_runs)))
         confidence_lower = errors_mean - (z * (errors_std / np.sqrt(n_runs)))
 
+        # ...for poisoned ensembles
         test_errors_p_ = np.array(test_errors_p_)
         errors_mean_p = np.mean(test_errors_p_, axis=0)
         errors_std_p = np.std(test_errors_p_, axis=0)
@@ -202,12 +200,10 @@ def main():
         confidence_lower_p = errors_mean_p \
                              - (z * (errors_std_p / np.sqrt(n_runs)))
 
-        # Plot average errors and confidence intervals
+        # Plot average errors and confidence intervals...
         plt.figure()
-        plt.title('Average Error for Seed ' + str(seed)
-                  + ' Over ' + str(n_runs) + ' Runs (95% Confidence Interval)')
 
-        # Baseline
+        # ...for baseline ensembles
         plt.plot(range(1, len(errors_mean) + 1),
                  errors_mean,
                  color='C0',
@@ -229,7 +225,7 @@ def main():
                          color='C0',
                          alpha=0.5)
 
-        # Poisoned
+        # ...for poisoned ensembles
         plt.plot(range(1, len(errors_mean_p) + 1),
                  errors_mean_p,
                  color='C1',
@@ -250,6 +246,10 @@ def main():
                          confidence_upper_p,
                          color='C1',
                          alpha=0.5)
+
+        # Plot settings
+        plt.title('Average Error for Seed ' + str(seed)
+                  + ' Over ' + str(n_runs) + ' Runs (95% Confidence Interval)')
         plt.xlabel('Number of Trees')
         plt.ylabel('Test Error')
         plt.grid()
