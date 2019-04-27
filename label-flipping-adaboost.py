@@ -45,21 +45,7 @@ def main():
         test_errors_ = []
         test_errors_p_ = []
         print('Generating data...')
-        data, labels = make_classification(n_samples=100000,
-                                           n_features=2,
-                                           n_informative=2,
-                                           n_redundant=0,
-                                           n_repeated=0,
-                                           n_classes=2,
-                                           n_clusters_per_class=2,
-                                           weights=None,
-                                           flip_y=0.0,
-                                           class_sep=1.0,
-                                           hypercube=True,
-                                           shift=0.0,
-                                           scale=1.0,
-                                           shuffle=True,
-                                           random_state=seed)
+        data, labels = utils.make_dataset(seed)
 
         skf = StratifiedKFold(n_splits=utils.n_runs)
         run = 1
@@ -80,7 +66,8 @@ def main():
 
             print('Generating poisoned dataset...')
             flip_idx = np.random.choice(range(len(y_train)),
-                                        size=int(0.1*len(y_train)),
+                                        size=int(utils.percent_poison
+                                                 * len(y_train)),
                                         replace=False)
 
             if utils.flip_original:
@@ -172,22 +159,30 @@ def main():
             print('---------------------------')
 
         # Save experimental data to file...
-        savedir_ = utils.savedir + '\\seed-' + str(seed)
+        savedir_ = utils.savedir + '\seed-' + str(seed)
+        try:
+            os.makedirs(savedir_)
+        except FileExistsError:
+            pass
 
         # ...for baseline ensembles
         test_errors_ = np.array(test_errors_)
-        np.savetxt(savedir_ + '-test-errors-baseline.csv', test_errors_,
+        np.savetxt(savedir_ + '\\test-errors-baseline.csv', test_errors_,
                    fmt='%.18f', delimiter=',')
 
         # ...for poisoned ensembles
         test_errors_p_ = np.array(test_errors_p_)
-        np.savetxt(savedir_ + '-test-errors-poisoned.csv', test_errors_p_,
+        np.savetxt(savedir_ + '\\test-errors-poisoned.csv', test_errors_p_,
                    fmt='%.18f', delimiter=',')
 
         # Plot average errors and confidence intervals...
         utils.plot_statistical_significance(test_errors_, test_errors_p_, seed)
 
-    print('Runtime:', time.time() - start, 'seconds.')
+    s = time.time() - start
+    h, s = divmod(s, 3600)
+    m, s = divmod(s, 60)
+    print('Runtime: {0:d} hours, {1:d} minutes, {2:.2f} seconds.'
+          .format(int(h), int(m), s))
     plt.show()
     print('Done.')
 
