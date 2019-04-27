@@ -25,7 +25,6 @@ import os
 import time
 from copy import deepcopy
 import numpy as np
-from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split as tts
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score
@@ -90,7 +89,7 @@ def main():
             ensemble.fit(d_train, y_train)
 
             print('Predicting on test data...')
-            test_errors = [1. - accuracy_score(y_test, p) for p in
+            test_errors = [1. - accuracy_score(y_test, pred) for pred in
                            ensemble.staged_predict(d_test)]
 
             ensemble_errors = ensemble.estimator_errors_[:len(ensemble)]
@@ -101,7 +100,7 @@ def main():
             ensemble_p.fit(d_train_p, y_train_p)
 
             print('Predicting on test data...')
-            test_errors_p = [1. - accuracy_score(y_test, p) for p in
+            test_errors_p = [1. - accuracy_score(y_test, pred) for pred in
                              ensemble_p.staged_predict(d_test)]
 
             ensemble_errors_p = ensemble_p.estimator_errors_[:len(ensemble_p)]
@@ -159,6 +158,7 @@ def main():
             print('---------------------------')
 
         # Save experimental data to file...
+        print('Saving data to file...')
         savedir_ = utils.savedir + '\seed-' + str(seed)
         try:
             os.makedirs(savedir_)
@@ -177,6 +177,8 @@ def main():
 
         # Plot average errors and confidence intervals...
         utils.plot_statistical_significance(test_errors_, test_errors_p_, seed)
+        print('Done.')
+        print('---------------------------')
 
     s = time.time() - start
     h, s = divmod(s, 3600)
@@ -188,3 +190,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

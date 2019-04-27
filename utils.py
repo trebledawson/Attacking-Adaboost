@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 
 seeds = [5, 7, 10, 11, 27, 42, 314, 666, 1618, 3901]  # Chosen arbitrarily
 max_ensemble_size = 10000  # Show behavior up to and including this ensemble size
-percent_poison = 0.1  # Fraction of training data to be poisoned
-flip_original = False  # If True, directly flip data labels. Else, copy data.
+percent_poison = 0.01  # Fraction of training data to be poisoned
+flip_original = True  # If True, directly flip data labels. Else, copy data.
 plot_runs = False  # If True, plot individual run errors.
 n_runs = 100  # For statistical significance
 z = 1.96  # 95% confidence interval
@@ -25,9 +25,10 @@ z = 1.96  # 95% confidence interval
 # Save results in this local directory
 savedir = '.\Results\\' + str(date.today()) + '\\2Class-10-seeds-100-runs'
 if flip_original:
-    savedir += '-flip-original'
+    savedir += '-flip-original-'
 else:
-    savedir += '-add-copies'
+    savedir += '-add-copies-'
+savedir += str(int(100 * percent_poison)) + '-percent'
 
 try:
     os.makedirs(savedir)
@@ -35,21 +36,21 @@ except FileExistsError:
     pass
 
 def make_dataset(seed):
-    make_classification(n_samples=100000,
-                        n_features=2,
-                        n_informative=2,
-                        n_redundant=0,
-                        n_repeated=0,
-                        n_classes=2,
-                        n_clusters_per_class=2,
-                        weights=None,
-                        flip_y=0.0,
-                        class_sep=1.0,
-                        hypercube=True,
-                        shift=0.0,
-                        scale=1.0,
-                        shuffle=True,
-                        random_state=seed)
+    return make_classification(n_samples=100000,
+                               n_features=2,
+                               n_informative=2,
+                               n_redundant=0,
+                               n_repeated=0,
+                               n_classes=2,
+                               n_clusters_per_class=2,
+                               weights=None,
+                               flip_y=0.0,
+                               class_sep=1.0,
+                               hypercube=True,
+                               shift=0.0,
+                               scale=1.0,
+                               shuffle=True,
+                               random_state=seed)
 
 def make_classifier():
     return DecisionTreeClassifier(criterion='gini',
