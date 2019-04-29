@@ -35,6 +35,8 @@ import utils
 
 # Experimental parameters
 dataset = 'digits'
+classifier = 'tree'
+depth = 4
 n_folds = 100
 if n_folds >= 30:
     test_type = 'Z'
@@ -52,7 +54,15 @@ savedir += str(int(100 * utils.percent_poison)) + '-percent'
 try:
     os.makedirs(savedir)
 except FileExistsError:
-    pass
+    path_exists = True
+    slug = 1
+    while path_exists:
+        try:
+            os.makedirs(savedir + '-' + str(slug))
+            path_exists = False
+        except FileExistsError:
+            slug += 1
+    savedir += '-' + str(slug)
 
 def main():
     start = time.time()
@@ -72,7 +82,9 @@ def main():
                                                stratify=None)
 
         print('Initializing ensemble base classifier...')
-        BaseClassifier = utils.make_classifier()
+        print('---Classifier :', classifier)
+        print('---Depth      :', depth)
+        BaseClassifier = utils.make_classifier(classifier, depth)
 
         print('Generating poisoned dataset...')
         flip_idx = np.random.choice(range(len(y_train)),
@@ -95,6 +107,7 @@ def main():
 
         print('Training size:', len(y_train))
         print('Poisoned size:', len(y_train_p))
+        print('---Percent poisoned :', 100 * utils.percent_poison)
         print('Testing size:', len(y_test))
 
         # Train and test on baseline data

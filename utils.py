@@ -33,10 +33,11 @@ else:
     savedir += '-add-copies-'
 savedir += str(int(100 * percent_poison)) + '-percent'
 
-try:
-    os.makedirs(savedir)
-except FileExistsError:
-    pass
+if __name__ == '__main__':
+    try:
+        os.makedirs(savedir)
+    except FileExistsError:
+        pass
 
 def make_dataset(seed):
     return make_classification(n_samples=100000,
@@ -79,19 +80,22 @@ def load_dataset(dataset):
     else:
         raise ValueError('Invalid dataset specified.')
 
-def make_classifier():
-    return DecisionTreeClassifier(criterion='gini',
-                                  splitter='best',
-                                  max_depth=1,
-                                  min_samples_split=2,
-                                  min_samples_leaf=1,
-                                  min_weight_fraction_leaf=0.0,
-                                  max_features=None,
-                                  random_state=7,
-                                  max_leaf_nodes=None,
-                                  min_impurity_decrease=0.0,
-                                  class_weight=None,
-                                  presort=False)
+def make_classifier(classifier='tree', depth=1):
+    if classifier == 'tree':
+        return DecisionTreeClassifier(criterion='gini',
+                                      splitter='best',
+                                      max_depth=depth,
+                                      min_samples_split=2,
+                                      min_samples_leaf=1,
+                                      min_weight_fraction_leaf=0.0,
+                                      max_features=None,
+                                      random_state=7,
+                                      max_leaf_nodes=None,
+                                      min_impurity_decrease=0.0,
+                                      class_weight=None,
+                                      presort=False)
+    else:
+        raise ValueError('Invalid classifier specified.')
 
 def make_ensemble(BaseClassifier):
     print('Initializing boosted classifier...')

@@ -61,7 +61,7 @@ def main():
                                                    stratify=None)
 
             print('Initializing ensemble base classifier...')
-            BaseClassifier = utils.make_classifier()
+            BaseClassifier = utils.make_classifier('tree')
 
             print('Generating poisoned dataset...')
             flip_idx = np.random.choice(range(len(y_train)),
