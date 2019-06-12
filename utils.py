@@ -1,10 +1,10 @@
-# ############################################################################# #
-# utils.py                                                                      #
-# Author: Glenn Dawson                                                          #
-# ---------------------                                                         #
-# Configuration parameters and utility functions for                            #
-# label-flipping-adaboost.py.                                                   #
-# ############################################################################# #
+# ############################################################################ #
+# utils.py                                                                     #
+# Author: Glenn Dawson                                                         #
+# ---------------------                                                        #
+# Configuration parameters and utility functions for label-flipping attacks    #
+# against Adaboost and XGBoost.                                                #
+# ############################################################################ #
 
 import os
 from datetime import date
@@ -15,6 +15,7 @@ import sklearn.datasets as datasets
 from sklearn.datasets import make_classification
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
+from xgboost import XGBClassifier, DMatrix
 import matplotlib.pyplot as plt
 
 seeds = [5, 7, 10, 11, 27, 42, 314, 666, 1618, 3901]  # Chosen arbitrarily
@@ -80,6 +81,9 @@ def load_dataset(dataset):
     else:
         raise ValueError('Invalid dataset specified.')
 
+def make_dmatrix(data, labels):
+    return DMatrix(data=data, label=labels)
+
 def make_classifier(classifier='tree', depth=1):
     if classifier == 'tree':
         return DecisionTreeClassifier(criterion='gini',
@@ -97,13 +101,22 @@ def make_classifier(classifier='tree', depth=1):
     else:
         raise ValueError('Invalid classifier specified.')
 
-def make_ensemble(BaseClassifier):
+def make_ensemble(boost='adaboost', base_classifier=None):
     print('Initializing boosted classifier...')
-    return AdaBoostClassifier(BaseClassifier,
-                              n_estimators=max_ensemble_size,
-                              learning_rate=1.0,
-                              algorithm='SAMME.R',
-                              random_state=3901)
+    if boost.lower() == 'adaboost':
+        return AdaBoostClassifier(base_classifier,
+                                  n_estimators=max_ensemble_size,
+                                  learning_rate=1.0,
+                                  algorithm='SAMME.R',
+                                  random_state=3901)
+    elif boost.lower() == 'xgboost':
+        return XGBClassifier(max_depth=1,
+                             n_estimators=max_ensemble_size,
+                             learning_rate=1.0,
+                             verbosity=0,
+                             n_jobs=1)
+    else:
+        raise ValueError('Invalid boosting algorithm selected.')
 
 def plot_statistical_significance(test_errors, test_errors_p, seed):
     print('Calculating average errors and confidence intervals...')

@@ -112,7 +112,7 @@ def main():
 
         # Train and test on baseline data
         print('Fitting model on training data...')
-        ensemble = utils.make_ensemble(BaseClassifier)
+        ensemble = utils.make_ensemble(base_classifier=BaseClassifier)
         ensemble.fit(d_train, y_train)
 
         print('Predicting on test data...')
@@ -123,7 +123,7 @@ def main():
 
         # Train and test on poisoned data
         print('Fitting model on poisoned training data...')
-        ensemble_p = utils.make_ensemble(BaseClassifier)
+        ensemble_p = utils.make_ensemble(base_classifier=BaseClassifier)
         ensemble_p.fit(d_train_p, y_train_p)
 
         print('Predicting on test data...')

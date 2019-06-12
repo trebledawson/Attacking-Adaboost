@@ -1,25 +1,25 @@
-# ############################################################################# #
-# label-flipping-adaboost.py                                                    #
-# Author: Glenn Dawson                                                          #
-# ---------------------------                                                   #
-# This file attempts to poison the Adaboost algorithm by flipping the labels of #
-# a certain percentage of the training data. There are two possible attack      #
-# schemas:                                                                      #
-#  * First, the attacker is assumed to have the ability to directly flip the    #
-#    labels of the genuine data in the training dataset.                        #
-#  * Second, the attack is not assumed to have this ability, but can instead    #
-#    insert copies of the genuine data, with flipped labels, into the training  #
-#    dataset.                                                                   #
-# These two schemas may be toggled by flipping the "flip-original" flag; if     #
-# True, then the first schema is chosen; otherwise the second schema is chosen. #
-#                                                                               #
-# Experiments are carried out on a number of classification problems equal to   #
-# len(seeds). For each problem, 100,000 samples are generated. Over n_runs      #
-# iterations, an Adaboost classifier built on decision trees is trained, first  #
-# on the baseline, unpoisoned dataset, and then on the dataset poisoned by      #
-# label-flipping. The average error over n_runs is reported, along with a 95%   #
-# confidence interval.                                                          #
-# ############################################################################# #
+# ############################################################################ #
+# label-flipping-xgboost.py                                                    #
+#  Author: Glenn Dawson                                                        #
+# ---------------------------                                                  #
+# This file attempts to poison the XGBoost algorithm by flipping the labels of #
+# a certain percentage of the training data. There are two possible attack     #
+# schemas:                                                                     #
+#  * First, the attacker is assumed to have the ability to directly flip the   #
+#    labels of the genuine data in the training dataset.                       #
+#  * Second, the attack is not assumed to have this ability, but can instead   #
+#    insert copies of the genuine data, with flipped labels, into the training #
+#    dataset.                                                                  #
+# These two schemas may be toggled by flipping the "flip-original" flag; if    #
+# True, then the first schema is chosen; otherwise the second schema is chosen.#
+#                                                                              #
+# Experiments are carried out on a number of classification problems equal to  #
+# len(seeds). For each problem, 100,000 samples are generated. Over n_runs     #
+# iterations, an XGBoost classifier built on decision trees is trained, first  #
+# on the baseline, unpoisoned dataset, and then on the dataset poisoned by     #
+# label-flipping. The average error over n_runs is reported, along with a 95%  #
+# confidence interval.                                                         #
+# ############################################################################ #
 
 import os
 import time
@@ -40,7 +40,6 @@ except FileExistsError:
 def main():
     start = time.time()
     for seed in utils.seeds:
-        less_than_max = False
         test_errors_ = []
         test_errors_p_ = []
         print('Generating data...')
@@ -59,9 +58,6 @@ def main():
                                                    test_size=0.3,
                                                    shuffle=True,
                                                    stratify=None)
-
-            print('Initializing ensemble base classifier...')
-            BaseClassifier = utils.make_classifier('tree')
 
             print('Generating poisoned dataset...')
             flip_idx = np.random.choice(range(len(y_train)),
@@ -83,43 +79,44 @@ def main():
                 d_train_p = np.vstack((d_train, d_p))
                 y_train_p = np.hstack((y_train, y_p))
 
+            test_dmatrix = utils.make_dmatrix(d_test, y_test)
+
             # Train and test on baseline data
             print('Fitting model on training data...')
-            ensemble = utils.make_ensemble(base_classifier=BaseClassifier)
-            ensemble.fit(d_train, y_train)
+            xgb_ensemble = utils.make_ensemble(boost='xgboost')
+            xgb_ensemble.fit(d_train, y_train, verbose=False)
 
             print('Predicting on test data...')
-            test_errors = [1. - accuracy_score(y_test, pred) for pred in
-                           ensemble.staged_predict(d_test)]
-
-            ensemble_errors = ensemble.estimator_errors_[:len(ensemble)]
+            test_errors = []
+            for n in range(1, utils.max_ensemble_size):
+                pred = xgb_ensemble.predict(test_dmatrix, ntree_limit=n)
+                test_errors.append(1. - accuracy_score(y_test, pred))
 
             # Train and test on poisoned data
             print('Fitting model on poisoned training data...')
-            ensemble_p = utils.make_ensemble(base_classifier=BaseClassifier)
-            ensemble_p.fit(d_train_p, y_train_p)
+            xgb_ensemble_p = utils.make_ensemble(boost='xgboost')
+            xgb_ensemble_p.fit(d_train_p, y_train_p, verbose=False)
 
             print('Predicting on test data...')
-            test_errors_p = [1. - accuracy_score(y_test, pred) for pred in
-                             ensemble_p.staged_predict(d_test)]
-
-            ensemble_errors_p = ensemble_p.estimator_errors_[:len(ensemble_p)]
+            test_errors_p = []
+            for n in range(1, utils.max_ensemble_size):
+                pred = xgb_ensemble_p.predict(test_dmatrix, ntree_limit=n)
+                test_errors_p.append(1. - accuracy_score(y_test, pred))
 
             # Store individual run errors for statistical analysis
             test_errors_.append(test_errors)
             test_errors_p_.append(test_errors_p)
 
             print('Baseline error:', test_errors[-1],
-                  '| # Trees:', len(ensemble))
+                  '| # Trees:', utils.max_ensemble_size)
             print('Poisoned error:', test_errors_p[-1],
-                  '| # Trees:', len(ensemble_p))
+                  '| # Trees:', utils.max_ensemble_size)
 
             # Plot individual run errors
             if utils.plot_runs:
                 print('Plotting...')
                 plt.figure()
-                plt.suptitle('Testing on AdaBoost')
-                plt.subplot(311)
+                plt.title('Testing on XGBoost')
                 plt.plot(range(1, len(test_errors) + 1),
                          test_errors,
                          label='Baseline')
@@ -129,37 +126,11 @@ def main():
                 plt.ylabel('Test Error')
                 plt.grid()
                 plt.legend()
-
-                plt.subplot(312)
-                plt.plot(range(1, len(ensemble_errors) + 1),
-                         ensemble_errors,
-                         c='black', label='Baseline')
-                plt.ylabel('Classifier Error')
-                plt.grid()
-                plt.legend()
-
-                plt.subplot(313)
-                plt.plot(range(1, len(ensemble_errors_p) + 1),
-                         ensemble_errors_p,
-                         c='black', label='Poisoned')
-                plt.xlabel('Number of Trees')
-                plt.ylabel('Classifier Error')
-                plt.grid()
-                plt.legend()
-
-            # Check if Adaboost algorithm terminated early (may cause issues
-            # in statistical analysis)
-            if len(ensemble) < utils.max_ensemble_size or \
-                            len(ensemble_p) < utils.max_ensemble_size:
-                less_than_max = True
-            if less_than_max:
-                print('Warning: Ensemble created with fewer than',
-                      utils.max_ensemble_size, 'trees.')
             print('---------------------------')
 
         # Save experimental data to file...
         print('Saving data to file...')
-        savedir_ = utils.savedir + '\seed-' + str(seed)
+        savedir_ = utils.savedir + '\\xgboost\seed-' + str(seed)
         try:
             os.makedirs(savedir_)
         except FileExistsError:
