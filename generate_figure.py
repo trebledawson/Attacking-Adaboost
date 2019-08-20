@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 import utils
 
 def main(dir, seed):
-    data = pd.read_csv(dir + '\\test-errors-baseline.csv')
-    data_p = pd.read_csv(dir + '\\test-errors-poisoned.csv')
+    data = pd.read_csv(dir + '/test-errors-baseline.csv')
+    data_p = pd.read_csv(dir + '/test-errors-poisoned.csv')
 
-    utils.plot_statistical_significance(data, data_p, seed, boost='XGBoost')
+    utils.plot_statistical_significance(data, data_p, seed, savefig=False)
 
     plt.show()
 

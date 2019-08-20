@@ -48,8 +48,8 @@ def main():
         skf = StratifiedKFold(n_splits=utils.n_runs)
         run = 1
         for _, fold in skf.split(X=data, y=labels):
+            fold_start = time.time()
             print('Seed:', seed, '| Run:', run)
-            run += 1
 
             print('Splitting data...')
             d_fold = data[fold, :]
@@ -79,7 +79,7 @@ def main():
                 d_train_p = np.vstack((d_train, d_p))
                 y_train_p = np.hstack((y_train, y_p))
 
-            test_dmatrix = utils.make_dmatrix(d_test, y_test)
+            #test_dmatrix = utils.make_dmatrix(d_test, y_test)
 
             # Train and test on baseline data
             print('Fitting model on training data...')
@@ -89,7 +89,7 @@ def main():
             print('Predicting on test data...')
             test_errors = []
             for n in range(1, utils.max_ensemble_size):
-                pred = xgb_ensemble.predict(test_dmatrix, ntree_limit=n)
+                pred = xgb_ensemble.predict(d_test, ntree_limit=n)
                 test_errors.append(1. - accuracy_score(y_test, pred))
 
             # Train and test on poisoned data
@@ -100,7 +100,7 @@ def main():
             print('Predicting on test data...')
             test_errors_p = []
             for n in range(1, utils.max_ensemble_size):
-                pred = xgb_ensemble_p.predict(test_dmatrix, ntree_limit=n)
+                pred = xgb_ensemble_p.predict(d_test, ntree_limit=n)
                 test_errors_p.append(1. - accuracy_score(y_test, pred))
 
             # Store individual run errors for statistical analysis
@@ -126,11 +126,15 @@ def main():
                 plt.ylabel('Test Error')
                 plt.grid()
                 plt.legend()
+
+            print('Run', run, 'time: {0:.8f} seconds'.format(time.time() -
+                                                             fold_start))
+            run += 1
             print('---------------------------')
 
         # Save experimental data to file...
         print('Saving data to file...')
-        savedir_ = utils.savedir + '\\xgboost\seed-' + str(seed)
+        savedir_ = utils.savedir + '/xgboost/seed-' + str(seed)
         try:
             os.makedirs(savedir_)
         except FileExistsError:
@@ -138,16 +142,17 @@ def main():
 
         # ...for baseline ensembles
         test_errors_ = np.array(test_errors_)
-        np.savetxt(savedir_ + '\\test-errors-baseline.csv', test_errors_,
+        np.savetxt(savedir_ + '/test-errors-baseline.csv', test_errors_,
                    fmt='%.18f', delimiter=',')
 
         # ...for poisoned ensembles
         test_errors_p_ = np.array(test_errors_p_)
-        np.savetxt(savedir_ + '\\test-errors-poisoned.csv', test_errors_p_,
+        np.savetxt(savedir_ + '/test-errors-poisoned.csv', test_errors_p_,
                    fmt='%.18f', delimiter=',')
 
         # Plot average errors and confidence intervals...
-        utils.plot_statistical_significance(test_errors_, test_errors_p_, seed)
+        utils.plot_statistical_significance(test_errors_, test_errors_p_,
+                                            seed, savedir_)
         print('Done.')
         print('---------------------------')
 

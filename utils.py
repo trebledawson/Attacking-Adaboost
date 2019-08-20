@@ -19,7 +19,7 @@ from xgboost import XGBClassifier, DMatrix
 import matplotlib.pyplot as plt
 
 seeds = [5, 7, 10, 11, 27, 42, 314, 666, 1618, 3901]  # Chosen arbitrarily
-max_ensemble_size = 10000  # Show behavior up to and including this ensemble size
+max_ensemble_size = 2000  # Show behavior up to and including this ensemble size
 percent_poison = 0.1  # Fraction of training data to be poisoned
 flip_original = True  # If True, directly flip data labels. Else, copy data.
 plot_runs = False  # If True, plot individual run errors.
@@ -27,7 +27,7 @@ n_runs = 100  # For statistical significance
 z = 1.96  # 95% confidence interval
 
 # Save results in this local directory
-savedir = '.\Results\\' + str(date.today()) + '\\2Class-10-seeds-100-runs'
+savedir = './Results/' + str(date.today()) + '/2Class-10-seeds-100-runs'
 if flip_original:
     savedir += '-flip-original-'
 else:
@@ -59,14 +59,14 @@ def make_dataset(seed):
 
 def load_dataset(dataset):
     if dataset == 'breast-cancer':
-        data = pd.read_csv('.\Data\Breast-Cancer\\breast-cancer-numeric.csv',
+        data = pd.read_csv('./Data/Breast-Cancer/breast-cancer-numeric.csv',
                            index_col=0)
         labels = data.iloc[:, 0].to_numpy()
         data = data.iloc[:, 1:].to_numpy()
         return data, labels
 
     elif dataset == 'mushroom':
-        data = pd.read_csv('.\Data\Mushroom\\agaricus-lepiota-numeric.csv',
+        data = pd.read_csv('./Data/Mushroom/agaricus-lepiota-numeric.csv',
                            index_col=0)
         labels = data.iloc[:, 0].to_numpy()
         data = data.iloc[:, 1:].to_numpy()
@@ -114,11 +114,11 @@ def make_ensemble(boost='adaboost', base_classifier=None):
                              n_estimators=max_ensemble_size,
                              learning_rate=1.0,
                              verbosity=0,
-                             n_jobs=1)
+                             n_jobs=-1)
     else:
         raise ValueError('Invalid boosting algorithm selected.')
 
-def plot_statistical_significance(test_errors, test_errors_p, seed):
+def plot_statistical_significance(test_errors, test_errors_p, seed, savedir_='.', savefig=True):
     print('Calculating average errors and confidence intervals...')
 
     # Baseline
@@ -195,11 +195,13 @@ def plot_statistical_significance(test_errors, test_errors_p, seed):
     # Save figure to file
     fig = plt.gcf()
     fig.set_size_inches((11, 8.5), forward=False)
-    fig.savefig(fname=(savedir + '\seed-' + str(seed) + '\\full-plot.pdf'),
-                format='pdf',
-                orientation='landscape',
-                bbox_inches='tight',
-                dpi=1500)
+
+    if savefig:
+	    fig.savefig(fname=(savedir_ + '/full-plot.pdf'),
+	                format='pdf',
+	                orientation='landscape',
+	                bbox_inches='tight',
+	                dpi=1500)
 
 def plot_statistical_significance_real(test_errors, test_errors_p, dataset,
                                        n_folds, savedir_, type='Z'):
@@ -282,7 +284,7 @@ def plot_statistical_significance_real(test_errors, test_errors_p, dataset,
     # Save figure to file
     fig = plt.gcf()
     fig.set_size_inches((11, 8.5), forward=False)
-    fig.savefig(fname=(savedir_ + '\\full-plot.pdf'),
+    fig.savefig(fname=(savedir_ + '/full-plot.pdf'),
                 format='pdf',
                 orientation='landscape',
                 bbox_inches='tight',
